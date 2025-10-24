@@ -1,77 +1,96 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.gridspec as gridspec
 
-def plot_signal_file(csv_path):
-    """Plot a single signal CSV file with time on x-axis and ch1, ch2 on y-axis"""
-    # Read the CSV
+def plot_signal_file(ax, csv_path):
+    """Plot a single signal CSV file on given axes"""
     df = pd.read_csv(csv_path)
     
-    # Create the plot
-    plt.figure(figsize=(12, 6))
-    plt.plot(df['time'], df['ch1'], label='CH1', color='blue', linewidth=0.8)
-    plt.plot(df['time'], df['ch2'], label='CH2', color='red', linewidth=0.8)
+    ax.plot(df['time'], df['ch1'], label='CH1', color='blue', linewidth=0.8)
+    ax.plot(df['time'], df['ch2'], label='CH2', color='red', linewidth=0.8)
     
-    plt.xlabel('Time (s)')
-    plt.ylabel('Signal Value')
-    plt.title(f'Signal Plot: {csv_path.parent.parent.name}/{csv_path.parent.name}/{csv_path.name}')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    
-    return plt.gcf()
+    ax.set_xlabel('Time (s)', fontsize=8)
+    ax.set_ylabel('Signal Value', fontsize=8)
+    ax.legend(fontsize=7)
+    ax.grid(True, alpha=0.3)
+    ax.tick_params(labelsize=7)
 
-def plot_all_signals(data_root='PHMDC2019_Data', save_plots=True, show_plots=False):
+def plot_all_signals_pdf(data_root='PHMDC2019_Data', output_pdf='signal_plots.pdf'):
     """
-    Plot all signal files in the dataset
+    Plot all signal files organized by folder pairs (signal_1 and signal_2) in a PDF
     
     Parameters:
     - data_root: Root directory of the dataset
-    - save_plots: If True, save plots to 'plots' folder
-    - show_plots: If True, display plots interactively (slower)
+    - output_pdf: Output PDF filename
     """
     data_path = Path(data_root)
     
-    # Create output directory
-    if save_plots:
-        output_dir = Path('plots')
-        output_dir.mkdir(exist_ok=True)
+    # Find all directories containing signal files
+    signal_dirs = set()
+    for signal_file in data_path.glob('**/signal_*.csv'):
+        signal_dirs.add(signal_file.parent)
     
-    # Find all signal CSV files
-    signal_files = list(data_path.glob('**/signal_*.csv'))
+    signal_dirs = sorted(signal_dirs)
+    print(f"Found {len(signal_dirs)} directories with signal files")
     
-    print(f"Found {len(signal_files)} signal files")
-    
-    for i, signal_file in enumerate(signal_files, 1):
-        print(f"Processing {i}/{len(signal_files)}: {signal_file}")
+    # Create PDF
+    with PdfPages(output_pdf) as pdf:
+        rows_per_page = 4  # Number of folder pairs per page
         
-        try:
-            # Plot the signal
-            fig = plot_signal_file(signal_file)
+        for page_start in range(0, len(signal_dirs), rows_per_page):
+            page_dirs = signal_dirs[page_start:page_start + rows_per_page]
             
-            # Save the plot
-            if save_plots:
-                # Create organized output path
-                relative_path = signal_file.relative_to(data_path)
-                output_path = output_dir / f"{relative_path.parent.parent.name}_{relative_path.parent.name}_{signal_file.stem}.png"
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                fig.savefig(output_path, dpi=150, bbox_inches='tight')
-                print(f"  Saved to: {output_path}")
+            # Create figure for this page
+            fig = plt.figure(figsize=(11, 14))  # Letter size
             
-            # Show the plot
-            if show_plots:
-                plt.show()
+            for idx, signal_dir in enumerate(page_dirs):
+                # Get the parent folder names for title
+                parent_names = f"{signal_dir.parent.name}/{signal_dir.name}"
+                
+                # Find signal_1 and signal_2 files
+                signal_1 = signal_dir / 'signal_1.csv'
+                signal_2 = signal_dir / 'signal_2.csv'
+                
+                # Create subplot for this row (2 columns)
+                # Left column: signal_1
+                ax1 = plt.subplot(rows_per_page, 2, idx * 2 + 1)
+                if signal_1.exists():
+                    try:
+                        plot_signal_file(ax1, signal_1)
+                        ax1.set_title(f"{parent_names} - Signal 1", fontsize=9, fontweight='bold')
+                    except Exception as e:
+                        ax1.text(0.5, 0.5, f'Error: {e}', ha='center', va='center', transform=ax1.transAxes)
+                        ax1.set_title(f"{parent_names} - Signal 1 (Error)", fontsize=9, color='red')
+                else:
+                    ax1.text(0.5, 0.5, 'File not found', ha='center', va='center', transform=ax1.transAxes)
+                    ax1.set_title(f"{parent_names} - Signal 1 (Missing)", fontsize=9, color='gray')
+                
+                # Right column: signal_2
+                ax2 = plt.subplot(rows_per_page, 2, idx * 2 + 2)
+                if signal_2.exists():
+                    try:
+                        plot_signal_file(ax2, signal_2)
+                        ax2.set_title(f"{parent_names} - Signal 2", fontsize=9, fontweight='bold')
+                    except Exception as e:
+                        ax2.text(0.5, 0.5, f'Error: {e}', ha='center', va='center', transform=ax2.transAxes)
+                        ax2.set_title(f"{parent_names} - Signal 2 (Error)", fontsize=9, color='red')
+                else:
+                    ax2.text(0.5, 0.5, 'File not found', ha='center', va='center', transform=ax2.transAxes)
+                    ax2.set_title(f"{parent_names} - Signal 2 (Missing)", fontsize=9, color='gray')
             
+            plt.tight_layout()
+            pdf.savefig(fig, dpi=150)
             plt.close(fig)
             
-        except KeyboardInterrupt:
-            print("\nStopped by user")
-            plt.close('all')
-            break
-
-        except Exception as e:
-            print(f"  Error processing {signal_file}: {e}")
+            print(f"Processed page {page_start // rows_per_page + 1} ({len(page_dirs)} folders)")
+    
+    print(f"\nAll plots saved to: {output_pdf}")
 
 if __name__ == "__main__":
-    # Plot all signals and save to 'plots' folder
-    plot_all_signals(data_root="/Users/darrylad/Darryl/Research/18. Fatigue Crack Growth in Aluminum Lap Joint", save_plots=True, show_plots=False)
+    # Create single PDF with all plots
+    plot_all_signals_pdf(
+        data_root="/Users/darrylad/Darryl/Research/18. Fatigue Crack Growth in Aluminum Lap Joint",
+        output_pdf="signal_plots.pdf"
+    )
