@@ -2,4 +2,5 @@
 
 Plots graphs from csv files in a specific folder structure and generates an interactive html file to toggle views. (Change specifics in html.py and run)
 
-<img width="1840" height="1191" alt="Screenshot 2025-10-24 at 17 12 23" src="https://github.com/user-attachments/assets/692dbcc8-5035-45ed-9fd3-f5b59cef7b29" />
+<img width="1342" height="1167" alt="Screenshot 2025-10-24 at 18 17 20" src="https://github.com/user-attachments/assets/bc7dd9a3-2743-4e64-9386-f875747d4d08" />
+
