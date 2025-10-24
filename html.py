@@ -2,6 +2,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pathlib import Path
+import json
 
 def create_interactive_html(data_root='PHMDC2019_Data', output_html='signal_plots.html'):
     """Create interactive HTML with signal plots and toggle buttons"""
@@ -77,7 +78,7 @@ def create_interactive_html(data_root='PHMDC2019_Data', output_html='signal_plot
                 row=idx, col=1
             )
         
-        # Store indices: [signal1_ch1, signal1_ch2, signal2_ch1, signal2_ch2]
+        # Store indices: [signal1_ch1, signal1_ch2, signal2_ch1, signal2_ch4]
         trace_mapping[idx] = list(range(current_trace_idx, len(fig.data)))
     
     # Create buttons for toggling between Signal 1 and Signal 2
@@ -91,7 +92,7 @@ def create_interactive_html(data_root='PHMDC2019_Data', output_html='signal_plot
         visible_signal1.extend([True, True, False, False] if len(indices) == 4 else [True, True])
     
     buttons.append(dict(
-        label="Signal 1",
+        label="Signal 1 (Press 1)",
         method="update",
         args=[{"visible": visible_signal1}]
     ))
@@ -104,7 +105,7 @@ def create_interactive_html(data_root='PHMDC2019_Data', output_html='signal_plot
         visible_signal2.extend([False, False, True, True] if len(indices) == 4 else [False, False])
     
     buttons.append(dict(
-        label="Signal 2",
+        label="Signal 2 (Press 2)",
         method="update",
         args=[{"visible": visible_signal2}]
     ))
@@ -112,7 +113,7 @@ def create_interactive_html(data_root='PHMDC2019_Data', output_html='signal_plot
     # Update layout with buttons
     fig.update_layout(
         height=300 * num_rows,
-        title_text="Signal Plots - Use buttons to switch between Signal 1 and Signal 2",
+        title_text="Signal Plots - Use buttons or press 1/2 to switch, S to toggle",
         updatemenus=[
             dict(
                 type="buttons",
@@ -132,10 +133,89 @@ def create_interactive_html(data_root='PHMDC2019_Data', output_html='signal_plot
     fig.update_xaxes(title_text="Time (s)")
     fig.update_yaxes(title_text="Signal Value")
     
+    # Write HTML
     fig.write_html(output_html)
+    
+    # Add keyboard shortcuts via JavaScript injection
+    with open(output_html, 'r') as f:
+        html_content = f.read()
+    
+    # Convert Python boolean lists to JavaScript format using json.dumps
+    js_visible_signal1 = json.dumps(visible_signal1)
+    js_visible_signal2 = json.dumps(visible_signal2)
+    
+    # Get total number of traces
+    total_traces = len(fig.data)
+    
+    # JavaScript for keyboard shortcuts - FIXED: use trace indices
+    keyboard_script = f"""
+    <script>
+    // Track current signal state (1 or 2)
+    let currentSignal = 1;
+    
+    // Visibility arrays for each signal
+    const visibilitySignal1 = {js_visible_signal1};
+    const visibilitySignal2 = {js_visible_signal2};
+    const totalTraces = {total_traces};
+    
+    document.addEventListener('keydown', function(event) {{
+        const key = event.key.toLowerCase();
+        
+        // Get the plot div
+        const plotDiv = document.querySelector('.js-plotly-plot');
+        
+        if (!plotDiv) {{
+            console.error('Could not find plot div');
+            return;
+        }}
+        
+        // Press '1' for Signal 1
+        if (key === '1') {{
+            const traceIndices = Array.from({{length: totalTraces}}, (_, i) => i);
+            Plotly.restyle(plotDiv, 'visible', visibilitySignal1, traceIndices);
+            currentSignal = 1;
+            event.preventDefault();
+            console.log('Switched to Signal 1');
+        }}
+        // Press '2' for Signal 2
+        else if (key === '2') {{
+            const traceIndices = Array.from({{length: totalTraces}}, (_, i) => i);
+            Plotly.restyle(plotDiv, 'visible', visibilitySignal2, traceIndices);
+            currentSignal = 2;
+            event.preventDefault();
+            console.log('Switched to Signal 2');
+        }}
+        // Press 'S' to toggle between signals
+        else if (key === 's') {{
+            const traceIndices = Array.from({{length: totalTraces}}, (_, i) => i);
+            if (currentSignal === 1) {{
+                Plotly.restyle(plotDiv, 'visible', visibilitySignal2, traceIndices);
+                currentSignal = 2;
+                console.log('Toggled to Signal 2');
+            }} else {{
+                Plotly.restyle(plotDiv, 'visible', visibilitySignal1, traceIndices);
+                currentSignal = 1;
+                console.log('Toggled to Signal 1');
+            }}
+            event.preventDefault();
+        }}
+    }});
+    
+    // Show keyboard shortcuts hint
+    console.log('Keyboard shortcuts: Press 1 (Signal 1), 2 (Signal 2), S (Toggle)');
+    </script>
+    """
+    
+    # Insert the script before closing </body> tag
+    html_content = html_content.replace('</body>', f'{keyboard_script}</body>')
+    
+    with open(output_html, 'w') as f:
+        f.write(html_content)
+    
     print(f"Interactive HTML saved to: {output_html}")
     print(f"Total height: {300 * num_rows}px")
     print(f"Added toggle buttons for Signal 1/Signal 2")
+    print(f"Keyboard shortcuts: Press 1 (Signal 1), 2 (Signal 2), S (Toggle)")
 
 if __name__ == "__main__":
     create_interactive_html(
