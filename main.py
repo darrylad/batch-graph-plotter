@@ -8,8 +8,9 @@ def plot_signal_file(ax, csv_path):
     """Plot a single signal CSV file on given axes"""
     df = pd.read_csv(csv_path)
     
-    ax.plot(df['time'], df['ch1'], label='CH1', color='blue', linewidth=0.8)
-    ax.plot(df['time'], df['ch2'], label='CH2', color='red', linewidth=0.8)
+    # Rasterize the plot lines to reduce file size
+    ax.plot(df['time'], df['ch1'], label='CH1', color='blue', linewidth=0.8, rasterized=True)
+    ax.plot(df['time'], df['ch2'], label='CH2', color='red', linewidth=0.8, rasterized=True)
     
     ax.set_xlabel('Time (s)', fontsize=8)
     ax.set_ylabel('Signal Value', fontsize=8)
@@ -50,12 +51,12 @@ def plot_all_signals_pdf(data_root='PHMDC2019_Data', output_pdf='signal_plots.pd
                 parent_names = f"{signal_dir.parent.name}/{signal_dir.name}"
                 
                 # Find signal_1 and signal_2 files
-                signal_1 = signal_dir / 'signal_1.csv'
-                signal_2 = signal_dir / 'signal_2.csv'
-                
+                signal_1 : Path = signal_dir / 'signal_1.csv'
+                signal_2 : Path = signal_dir / 'signal_2.csv'
+
                 # Create subplot for this row (2 columns)
                 # Left column: signal_1
-                ax1 = plt.subplot(rows_per_page, 2, idx * 2 + 1)
+                ax1: plt.Axes = plt.subplot(rows_per_page, 2, idx * 2 + 1)
                 if signal_1.exists():
                     try:
                         plot_signal_file(ax1, signal_1)
@@ -81,12 +82,14 @@ def plot_all_signals_pdf(data_root='PHMDC2019_Data', output_pdf='signal_plots.pd
                     ax2.set_title(f"{parent_names} - Signal 2 (Missing)", fontsize=9, color='gray')
             
             plt.tight_layout()
-            pdf.savefig(fig, dpi=150)
+            # Increase DPI for rasterized content to maintain quality
+            pdf.savefig(fig, dpi=200)
             plt.close(fig)
             
             print(f"Processed page {page_start // rows_per_page + 1} ({len(page_dirs)} folders)")
     
     print(f"\nAll plots saved to: {output_pdf}")
+
 
 if __name__ == "__main__":
     # Create single PDF with all plots
